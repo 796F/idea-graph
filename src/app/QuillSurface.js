@@ -1,16 +1,14 @@
 var Surface = require('famous/core/Surface');
 
-function QuillSurface() {
+function QuillSurface(options) {
   Surface.apply(this, arguments);
   
   this._editor;
+  this._id;
 
-  var content = '<div id="toolbar">' + 
-                '<button class="ql-bold">Bold</button>' + 
-                '<button class="ql-italic">Italic</button></div>' +
-                '<div style="width: 100%; height: 100%; pointer-events: all;" id="' + this._id + '"></div>';
+  if (options) this.setOptions(options);
   
-  this.setContent(content);
+  _initQuill.call(this);
 
   this.on('deploy', _configureQuill.bind(this));
 }
@@ -28,20 +26,31 @@ QuillSurface.prototype.setOptions = function setOptions(options) {
   if (options.classes) this.setClasses(options.classes);
   if (options.properties) this.setProperties(options.properties);
   if (options.attributes) this.setAttributes(options.attributes);
+  if (options.id) this._id = options.id;
+  if (options.text) this._text = options.text;
   return this;
 };
 
 function _configureQuill() {
   this._editor = new Quill('#' + this._id);
-  this._editor.addModule('toolbar', { container: '#toolbar' });
+  // this._editor.addModule('toolbar', { container: '#toolbar' });
 
   this._initEvents();
   this._eventOutput.emit('initDone');
+  this.setEditorContent(this._text);
   // Engine.nextTick( _editorCommands.bind(this) );
 }
 
 QuillSurface.prototype.setEditorContent = function setEditorContent(content) {
-  this._editor.setText(this._id);
+  this._editor.setText(content);
+}
+
+function _initQuill() {
+  // var content = '<div id="toolbar">' + 
+  //               '<button class="ql-bold">Bold</button>' + 
+  //               '<button class="ql-italic">Italic</button></div>' +
+  var content = '<div style="width: 100%; height: 100%; pointer-events: all;" id="' + this._id + '"></div>';
+  this.setContent(content);
 }
 
 QuillSurface.prototype._initEvents = function _initEvents() {
@@ -60,7 +69,7 @@ QuillSurface.prototype._initEvents = function _initEvents() {
       if (range.start == range.end) {
         console.log('User cursor is on', range.start);
       } else {
-        var text = editor.getText(range.start, range.end);
+        var text = this._editor.getText(range.start, range.end);
         console.log('User has highlighted', text);
       }
     } else {

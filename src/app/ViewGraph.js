@@ -1,8 +1,10 @@
+var Engine         = require('famous/core/Engine');
 var View           = require('famous/core/View');
 var Surface        = require('famous/core/Surface');
 var Transform      = require('famous/core/Transform');
 var Modifier       = require('famous/core/Modifier');
 var Transitionable = require('famous/transitions/Transitionable');
+var TransitionableTransform = require('famous/transitions/TransitionableTransform');
 
 var RepulsionForce = require('famous/physics/forces/Repulsion');
 var Circle         = require('famous/physics/bodies/Circle');
@@ -13,6 +15,17 @@ var Drag           = require('famous/physics/forces/Drag');
 var Particle       = require('famous/physics/bodies/Particle');
 var Spring         = require('famous/physics/forces/Spring');
 var VectorField    = require('famous/physics/forces/VectorField');
+
+var MouseSync      = require("famous/inputs/MouseSync");
+var TouchSync      = require("famous/inputs/TouchSync");
+var ScrollSync     = require("famous/inputs/ScrollSync");
+var GenericSync    = require("famous/inputs/GenericSync");
+
+GenericSync.register({
+    "mouse"  : MouseSync,
+    "touch"  : TouchSync,
+    "scroll" : ScrollSync
+});
 
 function ViewGraph() {
     View.apply(this, arguments);
@@ -25,8 +38,24 @@ function ViewGraph() {
     this._interNodalForce;
     this._drag;
     this._anchor;
+    this._rootTransformer = new TransitionableTransform();
+    this._rootModifier = new Modifier({
+      origin : [0.5, 0.5],
+      align : [0.5, 0.5],
+      transform : this._rootTransformer
+    });
+    
+    this.sync = new GenericSync({
+      "mouse"  : {},
+      "touch"  : {},
+      "scroll" : {scale : 0.3}
+    });
 
+    this._rootNode = this.add(this._rootModifier);
     this._initPhysics();
+    this._initBackground();
+    this._bindEvents();
+    window.vg = this;
 }
 
 ViewGraph.prototype = Object.create(View.prototype);
@@ -38,7 +67,7 @@ ViewGraph.prototype.addView = function addView(viewId, view) {
   // var viewId = Object.keys(this._viewMap).length;
   var pair = this._createBodyModifierPair();
   
-  this.add(pair.modifier).add(view);
+  this._rootNode.add(pair.modifier).add(view);
 
   this._viewMap[viewId] = { view : view, body : pair.body };
   this._bodies.push(pair.body);
@@ -103,6 +132,8 @@ ViewGraph.prototype._createBodyModifierPair = function _createBodyModifierPair()
   });
 
   var modifier = new Modifier({
+    origin : [0.5, 0.5], 
+    align: [0.5, 0.5],
     transform : function () {
       return circle.getTransform();
     }
@@ -113,6 +144,25 @@ ViewGraph.prototype._createBodyModifierPair = function _createBodyModifierPair()
     body : circle
   };
 }
+
+ViewGraph.prototype._initBackground = function _initBackground(){
+  var bg = new Surface();
+  this.add(bg);
+  bg.pipe(this.sync);
+}
+
+ViewGraph.prototype._bindEvents = function _bindEvents() {
+  var self = this;
+  
+  self.sync.on('update', function(data) {
+    var old_translate = self._rootTransformer._finalTranslate;
+    old_translate[0] += data.delta[0];
+    old_translate[1] += data.delta[1];
+    self._rootTransformer.setTranslate(old_translate);
+  });
+  // Engine.pipe(self.sync);
+
+};
 
 function _randomVector() {
   return new Vector((0.5 - Math.random()) * 100, (0.5 - Math.random()) * 100, 0);
